@@ -75,7 +75,6 @@ document.getElementById("startBtn").onclick = async () => {
   // 2️⃣ Crear PeerJS
   peer = new Peer(streamId, {
   host: window.location.hostname,
-  port: window.location.port,   // ← NECESARIO
   secure: true,
   path: "/peerjs"
 });
