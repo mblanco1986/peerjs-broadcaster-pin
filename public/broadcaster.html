@@ -1,156 +1,103 @@
-<!doctype html>
+<!DOCTYPE html>
 <html>
 <head>
-  <meta charset="utf-8"/>
-  <meta name="viewport" content="width=device-width,initial-scale=1"/>
-  <title>Broadcaster (con PIN)</title>
+  <title>Broadcaster (Cámara Frontal)</title>
+  <script src="https://webrtc.github.io/adapter/adapter-latest.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.2/dist/peerjs.min.js"></script>
+
   <style>
-    body { font-family: system-ui, sans-serif; background:#0b0b0b; color:#fff; text-align:center; padding:16px; }
-    video { width:100%; max-width:720px; border-radius:8px; background:#000; }
-    input, button { padding:10px; margin-top:8px; width:100%; max-width:720px; box-sizing:border-box; }
-    .small { font-size:0.9rem; color:#ccc; margin-top:8px; }
+    body { font-family: Arial; background: #111; color: #eee; text-align:center; }
+    video { width:90%; border:3px solid #4caf50; border-radius:8px; margin-top:20px; }
+    input, button { padding:12px; font-size:18px; margin:10px; border-radius:8px; }
   </style>
 </head>
 <body>
-  <h1>📱 Broadcaster — Inicia emisión</h1>
-  <p class="small">Abre esta página en el navegador de tu Android, permite cámara y micro.</p>
 
-  <video id="localVideo" autoplay playsinline muted></video>
+<h1>📡 Emisión en directo</h1>
 
-  <div>
-    <input id="pinInput" placeholder="PIN de 4-6 dígitos (ej. 1234)" />
-    <button id="startBtn">▶️ Iniciar transmisión</button>
-    <button id="stopBtn" disabled>⏹️ Parar transmisión</button>
-  </div>
+<p>Introduce un PIN para proteger el acceso:</p>
+<input id="pinInput" type="password" placeholder="PIN" />
 
-  <p class="small">Tu ID (cópialo o toca para generar enlace de viewer):</p>
-  <input id="myId" readonly />
+<button id="startBtn">Iniciar transmisión</button>
 
-  <div style="margin-top:8px;">
-    <button id="shareWhats" disabled>📤 Compartir por WhatsApp</button>
-  </div>
+<video id="localVideo" autoplay playsinline></video>
 
-  <script src="https://unpkg.com/peerjs@1.4.7/dist/peerjs.min.js"></script>
-  <script>
-    const peerHost = window.location.hostname;
-    const peerPort = window.location.port || (window.location.protocol === 'https:' ? 443 : 80);
-    const peerPath = '/peerjs';
+<script>
+let localStream;
+let peer;
+let streamId = "stream-" + Math.random().toString(36).substr(2, 9);
 
-    const peer = new Peer(undefined, {
-      host: peerHost,
-      port: peerPort,
-      path: peerPath,
-      secure: window.location.protocol === 'https:'
+// 1️⃣ Obtener cámara frontal con compatibilidad Android 7
+async function getFrontCompatibleStream() {
+  // Paso A: intentar facingMode "user"
+  let constraints = {
+    audio: true,
+    video: { facingMode: "user", width: 640, height: 480 }
+  };
+
+  try {
+    return await navigator.mediaDevices.getUserMedia(constraints);
+  } catch (e1) {
+    console.warn("Falla facingMode → usando enumeración", e1);
+  }
+
+  // Paso B: enumerar cámaras y elegir la frontal por deviceId
+  try {
+    const devices = await navigator.mediaDevices.enumerateDevices();
+    const videos = devices.filter(d => d.kind === "videoinput");
+
+    let front = videos.find(v => v.label.toLowerCase().includes("front"));
+    let id = front ? front.deviceId : (videos[1]?.deviceId || videos[0]?.deviceId);
+
+    return await navigator.mediaDevices.getUserMedia({
+      audio: true,
+      video: { deviceId: { exact: id }, width: 640, height: 480 }
     });
 
-    const localVideo = document.getElementById('localVideo');
-    const startBtn = document.getElementById('startBtn');
-    const stopBtn = document.getElementById('stopBtn');
-    const myIdInput = document.getElementById('myId');
-    const pinInput = document.getElementById('pinInput');
-    const shareWhats = document.getElementById('shareWhats');
+  } catch (e2) {
+    console.warn("Falla deviceId → último fallback", e2);
+  }
 
-    let localStream = null;
+  // Paso C: fallback final para Android muy problemáticos
+  return await navigator.mediaDevices.getUserMedia({
+    audio: true,
+    video: true
+  });
+}
 
-    peer.on('open', id => {
-      myIdInput.value = id;
-      shareWhats.disabled = false;
-    });
+document.getElementById("startBtn").onclick = async () => {
+  const pin = document.getElementById("pinInput").value.trim();
+  if (!pin) {
+    alert("Debes introducir un PIN.");
+    return;
+  }
 
-    peer.on('error', err => {
-      console.error('Peer error', err);
-      alert('Error de Peer: ' + err);
-    });
+  // 2️⃣ Crear PeerJS
+  peer = new Peer(streamId, {
+    host: window.location.hostname,
+    port: window.location.port,
+    path: "/peerjs",
+    secure: true
+  });
 
-    // Responder llamadas de viewers
-    peer.on('call', call => {
-      if (!localStream) {
-        alert('Pulsa "Iniciar transmisión" primero.');
-        return;
-      }
-      call.answer(localStream); // enviamos nuestro stream al viewer
-    });
+  // 3️⃣ Obtener cámara frontal
+  localStream = await getFrontCompatibleStream();
+  document.getElementById("localVideo").srcObject = localStream;
 
-    async function startCapture() {
-      const pin = (pinInput.value || '').trim();
-      if (!/^\d{3,6}$/.test(pin)) {
-        alert('Introduce un PIN válido de 3-6 dígitos.');
-        return;
-      }
+  // 4️⃣ Cuando viewer pide la conexión, enviar stream
+  peer.on("call", call => {
+    call.answer(localStream);
+  });
 
-      try {
-        localStream = await navigator.mediaDevices.getUserMedia({
-          video: { width: 1280, height: 720, facingMode: 'environment' },
-          audio: true
-        });
-        localVideo.srcObject = localStream;
-        startBtn.disabled = true;
-        stopBtn.disabled = false;
+  // 5️⃣ Guardar PIN en el servidor vinculado al streamId
+  await fetch("/set-pin", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ streamId, pin })
+  });
 
-        // Registrar en el servidor el id + pin
-        const id = myIdInput.value;
-        await fetch('/register', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ id, pin })
-        });
-
-        // Opcional: renovar periódicamente (cada 10 min) para que no expire mientras transmites
-        setInterval(() => {
-          fetch('/renew', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ id, pin })
-          }).catch(()=>{});
-        }, 1000 * 60 * 10);
-
-      } catch (e) {
-        console.error('getUserMedia error', e);
-        alert('No se pudo acceder a la cámara/micrófono: ' + e.message);
-      }
-    }
-
-    function stopCapture() {
-      if (localStream) {
-        localStream.getTracks().forEach(t => t.stop());
-        localStream = null;
-        localVideo.srcObject = null;
-      }
-      startBtn.disabled = false;
-      stopBtn.disabled = true;
-    }
-
-    startBtn.addEventListener('click', startCapture);
-    stopBtn.addEventListener('click', stopCapture);
-
-    function getViewerLink() {
-      const id = myIdInput.value;
-      if (!id) return '';
-      return `${window.location.origin}/viewer.html?id=${encodeURIComponent(id)}`;
-    }
-
-    // Compartir por WhatsApp (abrewa con texto y enlace)
-    shareWhats.addEventListener('click', () => {
-      const link = getViewerLink();
-      const pin = pinInput.value || '';
-      if (!link) { alert('Aún no hay ID disponible'); return; }
-      const msg = encodeURIComponent(`Ver mi transmisión en directo:\n${link}\nPIN: ${pin}\n(Abre en el navegador y pega el PIN)`);
-      const wa = `https://wa.me/?text=${msg}`;
-      window.open(wa, '_blank');
-    });
-
-    // Copiar link al tocar el campo ID
-    myIdInput.addEventListener('click', async () => {
-      const link = getViewerLink();
-      if (link) {
-        try {
-          await navigator.clipboard.writeText(link);
-          alert('Enlace copiado al portapapeles:\n' + link);
-        } catch {
-          myIdInput.select();
-        }
-      }
-    });
-  </script>
+  alert("Transmisión iniciada.\nEl viewer podrá conectarse con tu PIN.");
+};
+</script>
 </body>
 </html>
