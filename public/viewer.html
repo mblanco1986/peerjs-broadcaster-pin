@@ -1,0 +1,94 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>Viewer (con PIN)</title>
+  <style>
+    body { font-family: system-ui, sans-serif; background:#050506; color:#fff; text-align:center; padding:16px; }
+    video { width:100%; max-width:900px; border-radius:8px; background:#000; }
+    input, button { padding:10px; margin-top:8px; width:100%; max-width:720px; box-sizing:border-box; }
+    .small { font-size:0.9rem; color:#ccc; margin-top:8px; }
+  </style>
+</head>
+<body>
+  <h1>👀 Viewer — Ver retransmisión (con PIN)</h1>
+  <p class="small">Introduce ID del broadcaster y su PIN (si vienes con ?id=... el ID se autocompleta)</p>
+
+  <input id="broadcasterId" placeholder="ID del broadcaster" />
+  <input id="pinInput" placeholder="PIN (ej. 1234)" />
+  <div>
+    <button id="watchBtn">▶️ Ver transmisión</button>
+  </div>
+
+  <video id="remoteVideo" autoplay playsinline controls></video>
+
+  <script src="https://unpkg.com/peerjs@1.4.7/dist/peerjs.min.js"></script>
+  <script>
+    const peerHost = window.location.hostname;
+    const peerPort = window.location.port || (window.location.protocol === 'https:' ? 443 : 80);
+    const peerPath = '/peerjs';
+
+    const peer = new Peer(undefined, {
+      host: peerHost,
+      port: peerPort,
+      path: peerPath,
+      secure: window.location.protocol === 'https:'
+    });
+
+    const broadcasterIdInput = document.getElementById('broadcasterId');
+    const pinInput = document.getElementById('pinInput');
+    const watchBtn = document.getElementById('watchBtn');
+    const remoteVideo = document.getElementById('remoteVideo');
+
+    // Rellenar ID desde query param si existe
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('id')) broadcasterIdInput.value = params.get('id');
+
+    peer.on('error', err => {
+      console.error('Peer error', err);
+      alert('Error de Peer: ' + err);
+    });
+
+    async function watch() {
+      const id = broadcasterIdInput.value.trim();
+      const pin = (pinInput.value || '').trim();
+      if (!id) { alert('Introduce el ID del broadcaster'); return; }
+      if (!/^\d{3,6}$/.test(pin)) { alert('Introduce un PIN válido de 3-6 dígitos'); return; }
+
+      // Validar PIN en el servidor antes de intentar conectar
+      try {
+        const res = await fetch(`/validate?id=${encodeURIComponent(id)}&pin=${encodeURIComponent(pin)}`);
+        if (!res.ok) {
+          const j = await res.json().catch(()=>({ error: 'error'}));
+          alert('No autorizado: ' + (j.error || res.statusText));
+          return;
+        }
+      } catch (e) {
+        alert('Error al validar PIN: ' + e.message);
+        return;
+      }
+
+      try {
+        // Hacemos call al broadcaster. No enviamos stream local (null).
+        const call = peer.call(id, null);
+        call.on('stream', remoteStream => {
+          remoteVideo.srcObject = remoteStream;
+        });
+        call.on('error', (e) => {
+          console.error('Call error', e);
+          alert('Error en la llamada: ' + e);
+        });
+        call.on('close', () => {
+          console.log('Llamada cerrada');
+        });
+      } catch (e) {
+        console.error('watch error', e);
+        alert('No se pudo establecer conexión: ' + e.message);
+      }
+    }
+
+    watchBtn.addEventListener('click', watch);
+  </script>
+</body>
+</html>
