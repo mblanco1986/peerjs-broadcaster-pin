@@ -82,9 +82,19 @@
 
       try {
         localStream = await navigator.mediaDevices.getUserMedia({
-          et constraints = {
-      video: true,
-      audio: true
+          let constraints = {
+  audio: true,
+  video: { width: 320, height: 240 }
+};
+
+try {
+  localStream = await navigator.mediaDevices.getUserMedia(constraints);
+} catch (e1) {
+  // fallback para Android 7
+  constraints = { audio: true, video: true };
+  localStream = await navigator.mediaDevices.getUserMedia(constraints);
+}
+
             
         });
         localVideo.srcObject = localStream;
