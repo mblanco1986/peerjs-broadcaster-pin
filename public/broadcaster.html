@@ -12,7 +12,7 @@
   </style>
 </head>
 <body>
-  <h1>Inicia emisión</h1>
+  <h1>📱 Broadcaster — Inicia emisión</h1>
   <p class="small">Abre esta página en el navegador de tu Android, permite cámara y micro.</p>
 
   <video id="localVideo" autoplay playsinline muted></video>
@@ -29,10 +29,8 @@
   <div style="margin-top:8px;">
     <button id="shareWhats" disabled>📤 Compartir por WhatsApp</button>
   </div>
-  
-  <script src="https://unpkg.com/peerjs@1.4.7/dist/peerjs.min.js"></script>
-  <script src="https://webrtc.github.io/adapter/adapter-latest.js"></script>
 
+  <script src="https://unpkg.com/peerjs@1.4.7/dist/peerjs.min.js"></script>
   <script>
     const peerHost = window.location.hostname;
     const peerPort = window.location.port || (window.location.protocol === 'https:' ? 443 : 80);
@@ -82,28 +80,8 @@
 
       try {
         localStream = await navigator.mediaDevices.getUserMedia({
-         let constraints = {
-  audio: true,
-  video: {
-    facingMode: "user",   // ← CÁMARA FRONTAL
-    width: 640,
-    height: 480
-  }
-};
-
-try {
-  localStream = await navigator.mediaDevices.getUserMedia(constraints);
-} catch (e1) {
-  console.warn("Error con cámara frontal, probando fallback…", e1);
-
-  // fallback para Android 7: usar video: true
-  constraints = { audio: true, video: true };
-
-  localStream = await navigator.mediaDevices.getUserMedia(constraints);
-}
-
-
-            
+          video: { width: 1280, height: 720, facingMode: 'environment' },
+          audio: true
         });
         localVideo.srcObject = localStream;
         startBtn.disabled = true;
