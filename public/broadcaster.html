@@ -29,7 +29,8 @@
   <div style="margin-top:8px;">
     <button id="shareWhats" disabled>📤 Compartir por WhatsApp</button>
   </div>
-
+  
+  <script src="https://unpkg.com/peerjs@1.4.7/dist/peerjs.min.js"></script>
   <script src="https://webrtc.github.io/adapter/adapter-latest.js"></script>
 
   <script>
@@ -82,17 +83,9 @@
       try {
         localStream = await navigator.mediaDevices.getUserMedia({
           et constraints = {
-  audio: true,
-  video: { width: 640, height: 480 }
-};
-
-try {
-  localStream = await navigator.mediaDevices.getUserMedia(constraints);
-} catch (e1) {
-  // fallback para Android 7
-  constraints = { audio: true, video: true };
-  localStream = await navigator.mediaDevices.getUserMedia(constraints);
-}
+      video: true,
+      audio: true
+            
         });
         localVideo.srcObject = localStream;
         startBtn.disabled = true;
