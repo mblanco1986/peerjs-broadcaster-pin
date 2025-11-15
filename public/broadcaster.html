@@ -79,10 +79,6 @@ document.getElementById("startBtn").onclick = async () => {
   path: "/peerjs"
 });
 
-peer.on("call", call => {
-  call.answer(localStream);
-});
-
   // 3️⃣ Obtener cámara frontal
   localStream = await getFrontCompatibleStream();
   document.getElementById("localVideo").srcObject = localStream;
