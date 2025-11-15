@@ -47,9 +47,11 @@ document.getElementById("connectBtn").onclick = async () => {
   // 2️⃣ Crear PeerJS
   const peer = new Peer({
   host: window.location.hostname,
+  port: window.location.port,
   secure: true,
   path: "/peerjs"
 });
+
 
   // 3️⃣ Llamar al broadcaster
   peer.on("open", () => {
