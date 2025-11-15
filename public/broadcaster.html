@@ -82,18 +82,26 @@
 
       try {
         localStream = await navigator.mediaDevices.getUserMedia({
-          let constraints = {
+         let constraints = {
   audio: true,
-  video: { width: 320, height: 240 }
+  video: {
+    facingMode: "user",   // ← CÁMARA FRONTAL
+    width: 640,
+    height: 480
+  }
 };
 
 try {
   localStream = await navigator.mediaDevices.getUserMedia(constraints);
 } catch (e1) {
-  // fallback para Android 7
+  console.warn("Error con cámara frontal, probando fallback…", e1);
+
+  // fallback para Android 7: usar video: true
   constraints = { audio: true, video: true };
+
   localStream = await navigator.mediaDevices.getUserMedia(constraints);
 }
+
 
             
         });
